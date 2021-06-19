@@ -4,20 +4,75 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
-	crcConfig "github.com/code-ready/crc/pkg/crc/config"
-	"github.com/code-ready/crc/pkg/crc/constants"
-	"github.com/code-ready/crc/pkg/crc/machine"
-	"github.com/code-ready/crc/pkg/crc/ssh"
 	. "github.com/onsi/gomega"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/ssh"
 )
 
-// CRCBuilder is used to build, customize and execute a CRC command.
+// =========== Podman ==========
+
+// PodmanBuilder is used to build, customize and execute a podman commands
+type PodmanBuilder struct {
+	cmd     *exec.Cmd
+	timeout <-chan time.Time
+}
+
+// NewPodmanCommand returns a PodmanBuilder for running Podman.
+func NewPodmanCommand(args ...string) *PodmanBuilder {
+	// TODO: split this to `podman-remote` for linux and `podman` for the rest
+	cmd := exec.Command("podman", args...)
+	return &PodmanBuilder{
+		cmd: cmd,
+	}
+}
+
+// WithTimeout sets the given timeout and returns itself.
+func (b *PodmanBuilder) WithTimeout(t <-chan time.Time) *PodmanBuilder {
+	b.timeout = t
+	return b
+}
+
+// ExecWithFullOutput runs the executable and returns the stdout and stderr.
+func (b PodmanBuilder) ExecWithFullOutput() (string, string, error) {
+	return Exec(b.cmd, b.timeout)
+}
+
+// Exec runs the executable.
+func (b PodmanBuilder) Exec() (string, error) {
+	stdout, _, err := b.ExecWithFullOutput()
+	return stdout, err
+}
+
+// ExecOrDie runs the executable or dies if error occurs.
+func (b PodmanBuilder) ExecOrDie() string {
+	stdout, err := b.Exec()
+	Expect(err).To(Not(HaveOccurred()))
+	return stdout
+}
+
+// ExecOrDieWithLogs runs the executable or dies if error occurs.
+func (b PodmanBuilder) ExecOrDieWithLogs() (string, string) {
+	stdout, stderr, err := b.ExecWithFullOutput()
+	Expect(err).To(Not(HaveOccurred()))
+	return stdout, stderr
+}
+
+//RunPodmanExpectSuccess
+func RunPodmanExpectSuccess(args ...string) string {
+	return NewPodmanCommand(args...).ExecOrDie()
+}
+
+// =========== CRC ==========
+
+// CRCBuilder is used to build, customize and execute a CRC commands
 type CRCBuilder struct {
 	cmd     *exec.Cmd
 	timeout <-chan time.Time
@@ -133,22 +188,106 @@ func RunCRCExpectFail(args ...string) (string, error) {
 	return stderr, nil
 }
 
+// Run command in the shell on the host
+func RunOnHost(timeout string, command string, args ...string) (string, string, error) {
+	parsedTimeout, err := time.ParseDuration(timeout)
+	if err != nil {
+		fmt.Printf("Failed to parse timeout string: %s, %v", timeout, err)
+		return "", "", err
+	}
+	cmd := exec.Command(command, args...)
+	tChan := make(chan time.Time, 1)
+
+	stdout, stderr, err := Exec(cmd, tChan)
+
+	time.Sleep(parsedTimeout)
+	tChan <- time.Now()
+
+	return stdout, stderr, err
+}
+
+// Run command in the shell on the host (assuming linux bash)
+func RunOnHostWithPrivilege(timeout string, args ...string) (string, string, error) {
+	parsedTimeout, err := time.ParseDuration(timeout)
+	if err != nil {
+		fmt.Printf("Failed to parse timeout string: %s, %v", timeout, err)
+		return "", "", err
+	}
+	cmd := exec.Command("sudo", args...)
+	tChan := make(chan time.Time, 1)
+
+	stdout, stderr, err := Exec(cmd, tChan)
+
+	time.Sleep(parsedTimeout)
+	tChan <- time.Now()
+
+	return stdout, stderr, err
+}
+
 // Send command to CRC VM via SSH
-func SendCommandToVM(cmd string) (string, error) {
-	client := machine.NewClient(constants.DefaultName, false, crcConfig.New(crcConfig.NewEmptyInMemoryStorage()))
-	connectionDetails, err := client.ConnectionDetails()
+func SendCommandToVM(cmd string, vm string, port string) (string, error) {
+	pkPath := filepath.Join(os.Getenv("HOME"), ".crc", "machines", "crc", "id_ecdsa")
+	pk, _ := ioutil.ReadFile(pkPath)
+	signer, err := ssh.ParsePrivateKey(pk)
+
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not parse the private key: %v", err)
 	}
-	ssh, err := ssh.NewClient(connectionDetails.SSHUsername, connectionDetails.IP, connectionDetails.SSHPort, connectionDetails.SSHKeys...)
+
+	config := &ssh.ClientConfig{
+		User:            "core",
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(signer),
+		},
+	}
+
+	destination := fmt.Sprintf("%s:%s", vm, port)
+	client, err := ssh.Dial("tcp", destination, config)
+
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to dial: %v", err)
 	}
-	out, _, err := ssh.Run(cmd)
+
+	// can be multiple of these per 1 client
+	session, err := client.NewSession()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create a session: %v", err)
 	}
-	return string(out), nil
+	defer session.Close()
+
+	// Use the session
+	var b bytes.Buffer
+	session.Stdout = &b
+	if err := session.Run(cmd); err != nil {
+		return "", fmt.Errorf("failed to run: %v", err)
+	}
+
+	return b.String(), nil
+}
+
+func RunCRCDaemon(c chan string) {
+
+	cmd := exec.Command("crc", "daemon")
+	err := cmd.Start()
+	if err != nil {
+		fmt.Printf("error running cmd: %v", err)
+	}
+
+	select {
+	case status := <-c:
+		if status == "done" {
+			err = cmd.Process.Kill()
+			if err != nil {
+				fmt.Printf("error killing the process: %v", err)
+			}
+		}
+	case <-time.After(30 * time.Minute):
+		err = cmd.Process.Kill()
+		if err != nil {
+			fmt.Printf("error killing the process: %v", err)
+		}
+	}
 }
 
 // ExitError is an interface that presents an API similar to os.ProcessState, which is
