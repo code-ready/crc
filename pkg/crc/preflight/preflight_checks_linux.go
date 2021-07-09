@@ -666,7 +666,12 @@ func getCPUFlags() (string, error) {
 }
 
 func runtimeExecutablePath() (string, error) {
-	path, err := filepath.Abs(os.Args[0])
+	path, err := exec.LookPath(os.Args[0])
+	if err != nil {
+		// os.Args[0] is not in $PATH, crc must have been started by specifying the path to its binary
+		path = os.Args[0]
+	}
+	path, err = filepath.Abs(path)
 	if err != nil {
 		return "", err
 	}
