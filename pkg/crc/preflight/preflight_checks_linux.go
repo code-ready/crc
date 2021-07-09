@@ -22,7 +22,6 @@ import (
 	crcos "github.com/code-ready/crc/pkg/os"
 	"github.com/code-ready/crc/pkg/os/linux"
 	libvirtxml "github.com/libvirt/libvirt-go-xml"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -667,25 +666,21 @@ func getCPUFlags() (string, error) {
 }
 
 func runtimeExecutablePath() (string, error) {
-	logging.Infof("runtimeExecutablePath: %s", os.Args[0])
 	path, err := filepath.Abs(os.Args[0])
 	if err != nil {
 		return "", err
 	}
-	path2, err := filepath.EvalSymlinks(path)
-	logging.Infof("filepath.EvalSymlinks(%s) = (%s, %v)", path, path2, err)
-
-	return path2, err
+	return filepath.EvalSymlinks(path)
 }
 
 func checkCrcSymlink() error {
 	runtimePath, err := runtimeExecutablePath()
 	if err != nil {
-		return errors.Wrap(err, "runtimeExecutablePath() failure")
+		return err
 	}
 	symlinkPath, err := filepath.EvalSymlinks(constants.CrcSymlinkPath)
 	if err != nil {
-		return errors.Wrapf(err, "EvalSymlinks(%s) failure", constants.CrcSymlinkPath)
+		return err
 	}
 	if symlinkPath != runtimePath {
 		return fmt.Errorf("%s points to %s, not to %s", constants.CrcSymlinkPath, symlinkPath, runtimePath)
@@ -699,9 +694,9 @@ func fixCrcSymlink() error {
 
 	runtimePath, err := runtimeExecutablePath()
 	if err != nil {
-		return errors.Wrap(err, "runtimeExecutablePath() failure")
+		return err
 	}
-	logging.Infof("symlinking %s to %s", runtimePath, constants.CrcSymlinkPath)
+	logging.Debugf("symlinking %s to %s", runtimePath, constants.CrcSymlinkPath)
 	return os.Symlink(runtimePath, constants.CrcSymlinkPath)
 }
 
