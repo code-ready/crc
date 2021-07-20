@@ -455,11 +455,11 @@ func (client *client) Start(ctx context.Context, startConfig types.StartConfig) 
 
 	logging.Info("Starting OpenShift cluster... [waiting for the cluster to stabilize]")
 	if err := cluster.WaitForClusterStable(ctx, instanceIP, constants.KubeconfigFilePath); err != nil {
-		logging.Errorf("Cluster is not ready: %v", err)
+		return nil, err
 	}
 
 	if err := waitForProxyPropagation(ctx, ocConfig, proxyConfig); err != nil {
-		logging.Debug("Failed to propagate proxy settings to cluster")
+		return nil, errors.Wrap(err, "Failed to propagate proxy settings to cluster")
 	}
 
 	clusterConfig, err := getClusterConfig(crcBundleMetadata)
@@ -469,7 +469,7 @@ func (client *client) Start(ctx context.Context, startConfig types.StartConfig) 
 
 	logging.Info("Adding crc-admin and crc-developer contexts to kubeconfig...")
 	if err := writeKubeconfig(instanceIP, clusterConfig); err != nil {
-		logging.Errorf("Cannot update kubeconfig: %v", err)
+		return nil, err
 	}
 
 	return &types.StartResult{
