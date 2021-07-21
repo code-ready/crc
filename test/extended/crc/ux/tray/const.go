@@ -13,8 +13,7 @@ const (
 
 	userKubeadmin string = "kubeadmin"
 	userDeveloper string = "developer"
-)
 
-const (
-	trayClusterStateTimeout = "90"
+	trayClusterStateRetries int = 15
+	trayClusterStateTimeout int = 90
 )

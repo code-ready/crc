@@ -12,6 +12,7 @@ github.com/Microsoft/go-winio/pkg/guid
 github.com/RangelReale/osincli
 # github.com/RedHatQE/gowinx v0.0.0-20210721124518-184264937503
 ## explicit
+github.com/RedHatQE/gowinx/pkg/app/action-center
 github.com/RedHatQE/gowinx/pkg/util
 github.com/RedHatQE/gowinx/pkg/util/logging
 github.com/RedHatQE/gowinx/pkg/win32/api/system-services

@@ -9,6 +9,7 @@ import (
 	"github.com/RedHatQE/gowinx/pkg/win32/interaction"
 	"github.com/RedHatQE/gowinx/pkg/win32/ux"
 	clicumber "github.com/code-ready/clicumber/testsuite"
+	"github.com/code-ready/crc/test/extended/util"
 )
 
 type gowinxHandler struct {
@@ -86,11 +87,13 @@ func (g gowinxHandler) SetPullSecret() error {
 }
 
 func (g gowinxHandler) IsClusterRunning() error {
-	return waitTrayShowsFieldWithValue(stateRunning, checkTrayShowsStatusValue)
+	return util.MatchWithRetry(stateRunning, checkTrayShowsStatusValue,
+		trayClusterStateRetries, trayClusterStateTimeout)
 }
 
 func (g gowinxHandler) IsClusterStopped() error {
-	return waitTrayShowsFieldWithValue(stateStopped, checkTrayShowsStatusValue)
+	return util.MatchWithRetry(stateStopped, checkTrayShowsStatusValue,
+		trayClusterStateRetries, trayClusterStateTimeout)
 }
 
 func (g gowinxHandler) CopyOCLoginCommandAsKubeadmin() error {

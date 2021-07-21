@@ -10,6 +10,7 @@ import (
 
 	clicumber "github.com/code-ready/clicumber/testsuite"
 	"github.com/code-ready/crc/test/extended/os/applescript"
+	"github.com/code-ready/crc/test/extended/util"
 )
 
 const (
@@ -102,11 +103,13 @@ func (a applescriptHandler) SetPullSecret() error {
 }
 
 func (a applescriptHandler) IsClusterRunning() error {
-	return waitTrayShowsFieldWithValue(stateRunning, checkTrayShowsStatusValue)
+	return util.MatchWithRetry(stateRunning, checkTrayShowsStatusValue,
+		trayClusterStateRetries, trayClusterStateTimeout)
 }
 
 func (a applescriptHandler) IsClusterStopped() error {
-	return waitTrayShowsFieldWithValue(stateStopped, checkTrayShowsStatusValue)
+	return util.MatchWithRetry(stateStopped, checkTrayShowsStatusValue,
+		trayClusterStateRetries, trayClusterStateTimeout)
 }
 
 func (a applescriptHandler) CopyOCLoginCommandAsKubeadmin() error {
