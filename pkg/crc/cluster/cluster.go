@@ -410,6 +410,21 @@ func EnsurePullSecretPresentOnInstanceDisk(sshRunner *ssh.Runner, pullSecret Pul
 	return sshRunner.CopyData([]byte(content), vmPullSecretPath, 0600)
 }
 
+func WaitForPullSecretPresentOnInstanceDisk(sshRunner *ssh.Runner) error {
+	logging.Info("Waiting for user's pull secret part of instance disk...")
+	pullSecretPresentFunc := func() error {
+		stdout, stderr, err := sshRunner.RunPrivate(fmt.Sprintf("sudo cat %s", vmPullSecretPath))
+		if err != nil {
+			return fmt.Errorf("failed to read %s file: %v: %s", vmPullSecretPath, err, stderr)
+		}
+		if err := validation.ImagePullSecret(stdout); err != nil {
+			return &errors.RetriableError{Err: fmt.Errorf("pull secret not updated to disk")}
+		}
+		return nil
+	}
+	return errors.RetryAfter(7*time.Minute, pullSecretPresentFunc, 2*time.Second)
+}
+
 func WaitForRequestHeaderClientCaFile(sshRunner *ssh.Runner) error {
 	lookupRequestHeaderClientCa := func() error {
 		expired, err := checkCertValidity(sshRunner, AggregatorClientCert)
@@ -444,7 +459,7 @@ func DeleteOpenshiftAPIServerPods(ocConfig oc.Config) error {
 	}
 
 	deleteOpenshiftAPIServerPods := func() error {
-		cmdArgs := []string{"delete", "pod", "--all", "-n", "openshift-apiserver"}
+		cmdArgs := []string{"delete", "pod", "--all", "--force", "-n", "openshift-apiserver"}
 		_, stderr, err := ocConfig.WithFailFast().RunOcCommand(cmdArgs...)
 		if err != nil {
 			return &errors.RetriableError{Err: fmt.Errorf("Failed to delete pod from openshift-apiserver namespace %v: %s", err, stderr)}
