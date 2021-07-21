@@ -4,18 +4,44 @@ package installer
 
 import (
 	"fmt"
+	"os/exec"
+	"time"
+
+	"github.com/RedHatQE/gowinx/pkg/win32/ux"
+	"github.com/code-ready/crc/pkg/crc/logging"
 )
 
-type handler struct {
-	currentUserPassword *string
-	installerPath       *string
+const (
+	installerWindowTitle string = "CodeReady Containers Setup"
+
+	elementClickTime time.Duration = 2 * time.Second
+	installationTime time.Duration = 30 * time.Second
+)
+
+var installFlow = []element{
+	{"Next", elementClickTime, ux.BUTTON},
+	{"I accept the terms in the License Agreement", elementClickTime, ux.CHECKBOX},
+	{"Next", elementClickTime, ux.BUTTON},
+	{"Next", elementClickTime, ux.BUTTON},
+	{"Install", installationTime, ux.BUTTON},
+	{"Finish", elementClickTime, ux.BUTTON}}
+
+type element struct {
+	id          string
+	delay       time.Duration
+	elementType string
 }
 
-func NewInstaller(currentUserPassword *string, installerPath *string) Installer {
+type gowinxHandler struct {
+	CurrentUserPassword *string
+	InstallerPath       *string
+}
+
+func NewInstaller(currentUserPassword, installerPath *string) Installer {
 	// TODO check parameters as they are mandatory otherwise exit
-	return handler{
-		currentUserPassword: currentUserPassword,
-		installerPath:       installerPath}
+	return gowinxHandler{
+		CurrentUserPassword: currentUserPassword,
+		InstallerPath:       installerPath}
 
 }
 
@@ -23,6 +49,46 @@ func RequiredResourcesPath() (string, error) {
 	return "", nil
 }
 
-func (h handler) Install() error {
-	return fmt.Errorf("not implemented yet")
+func (g gowinxHandler) Install() error {
+	// Initialize context
+	ux.Initialize()
+	if err := runInstaller(*g.InstallerPath); err != nil {
+		return err
+	}
+	time.Sleep(elementClickTime)
+	for _, action := range installFlow {
+		// delay to get window as active
+		// need to get window everytime as its layout is changing
+		installer, err := ux.GetActiveElement(installerWindowTitle, ux.WINDOW)
+		if err != nil {
+			return err
+		}
+		element, err := installer.GetElement(action.id, action.elementType)
+		if err != nil {
+			err = fmt.Errorf("error getting %s with error %v", action.id, err)
+			logging.Error(err)
+			return err
+		}
+		if err := element.Click(); err != nil {
+			err = fmt.Errorf("error clicking %s with error %v", action.id, err)
+			logging.Error(err)
+			return err
+		}
+		// Delay after action
+		time.Sleep(action.delay)
+	}
+	// TODO which should be executed from a new cmd (to ensure ENVs)
+	// Finalize context
+	ux.Finalize()
+	return nil
+}
+
+func runInstaller(installerPath string) error {
+	cmd := exec.Command("msiexec.exe", "/i", installerPath, "/qf")
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("error starting %v with error %v", cmd, err)
+	}
+	// delay to get window as active
+	time.Sleep(1 * time.Second)
+	return nil
 }

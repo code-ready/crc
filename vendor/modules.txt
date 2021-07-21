@@ -10,6 +10,21 @@ github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 # github.com/RangelReale/osincli v0.0.0-20160924135400-fababb0555f2
 github.com/RangelReale/osincli
+# github.com/RedHatQE/gowinx v0.0.0-20210721124518-184264937503
+## explicit
+github.com/RedHatQE/gowinx/pkg/app/action-center
+github.com/RedHatQE/gowinx/pkg/util
+github.com/RedHatQE/gowinx/pkg/util/logging
+github.com/RedHatQE/gowinx/pkg/win32/api/system-services
+github.com/RedHatQE/gowinx/pkg/win32/api/user-interface/windows-accesibility-features
+github.com/RedHatQE/gowinx/pkg/win32/api/user-interface/windows-and-messages
+github.com/RedHatQE/gowinx/pkg/win32/api/util
+github.com/RedHatQE/gowinx/pkg/win32/desktop/notificationarea
+github.com/RedHatQE/gowinx/pkg/win32/interaction
+github.com/RedHatQE/gowinx/pkg/win32/services/process
+github.com/RedHatQE/gowinx/pkg/win32/ux
+github.com/RedHatQE/gowinx/pkg/win32/ux/toolbar
+github.com/RedHatQE/gowinx/pkg/win32/ux/windows
 # github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46
 ## explicit
 github.com/StackExchange/wmi
@@ -98,7 +113,6 @@ github.com/fsnotify/fsnotify
 # github.com/go-logr/logr v0.2.0
 github.com/go-logr/logr
 # github.com/go-ole/go-ole v1.2.5
-## explicit
 github.com/go-ole/go-ole
 github.com/go-ole/go-ole/oleutil
 # github.com/godbus/dbus/v5 v5.0.4
@@ -277,6 +291,8 @@ github.com/openshift/library-go/pkg/oauth/oauthdiscovery
 ## explicit
 github.com/openshift/oc/pkg/helpers/term
 github.com/openshift/oc/pkg/helpers/tokencmd
+# github.com/openstandia/w32uiautomation v0.0.0-20190416091226-c987b5b65d6b
+github.com/openstandia/w32uiautomation
 # github.com/patrickmn/go-cache v2.1.0+incompatible
 github.com/patrickmn/go-cache
 # github.com/pbnjay/memory v0.0.0-20201129165224-b12e5d931931
@@ -619,7 +635,7 @@ k8s.io/klog/v2
 # k8s.io/kubectl v0.20.1 => github.com/openshift/kubernetes-kubectl v0.0.0-20210108115031-c0d78c0aeda3
 k8s.io/kubectl/pkg/util/interrupt
 k8s.io/kubectl/pkg/util/term
-# k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+# k8s.io/utils v0.0.0-20210527160623-6fdb442a123b
 k8s.io/utils/integer
 # sigs.k8s.io/structured-merge-diff/v4 v4.0.2
 sigs.k8s.io/structured-merge-diff/v4/value
