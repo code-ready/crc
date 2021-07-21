@@ -455,10 +455,12 @@ func (client *client) Start(ctx context.Context, startConfig types.StartConfig) 
 
 	logging.Info("Starting OpenShift cluster... [waiting for the cluster to stabilize]")
 	if err := cluster.WaitForClusterStable(ctx, instanceIP, constants.KubeconfigFilePath); err != nil {
-		logging.Errorf("Cluster is not ready: %v", err)
+		return nil, err
 	}
 
-	waitForProxyPropagation(ctx, ocConfig, proxyConfig)
+	if err := waitForProxyPropagation(ctx, ocConfig, proxyConfig); err != nil {
+		return nil, errors.Wrap(err, "Failed to propagate proxy settings to cluster")
+	}
 
 	clusterConfig, err := getClusterConfig(crcBundleMetadata)
 	if err != nil {
@@ -467,7 +469,7 @@ func (client *client) Start(ctx context.Context, startConfig types.StartConfig) 
 
 	logging.Info("Adding crc-admin and crc-developer contexts to kubeconfig...")
 	if err := writeKubeconfig(instanceIP, clusterConfig); err != nil {
-		logging.Errorf("Cannot update kubeconfig: %v", err)
+		return nil, err
 	}
 
 	return &types.StartResult{
@@ -643,9 +645,9 @@ func ensureProxyIsConfiguredInOpenShift(ocConfig oc.Config, sshRunner *crcssh.Ru
 	return cluster.AddProxyConfigToCluster(sshRunner, ocConfig, proxy)
 }
 
-func waitForProxyPropagation(ctx context.Context, ocConfig oc.Config, proxyConfig *network.ProxyConfig) {
+func waitForProxyPropagation(ctx context.Context, ocConfig oc.Config, proxyConfig *network.ProxyConfig) error {
 	if !proxyConfig.IsEnabled() {
-		return
+		return nil
 	}
 	logging.Info("Waiting for the proxy configuration to be applied...")
 	checkProxySettingsForOperator := func() error {
@@ -661,9 +663,7 @@ func waitForProxyPropagation(ctx context.Context, ocConfig oc.Config, proxyConfi
 		return nil
 	}
 
-	if err := crcerrors.RetryAfterWithContext(ctx, 300*time.Second, checkProxySettingsForOperator, 2*time.Second); err != nil {
-		logging.Debug("Failed to propagate proxy settings to cluster")
-	}
+	return crcerrors.RetryAfterWithContext(ctx, 300*time.Second, checkProxySettingsForOperator, 2*time.Second)
 }
 
 func logBundleDate(crcBundleMetadata *bundle.CrcBundleInfo) {
